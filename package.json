@@ -1,0 +1,25 @@
+{
+  "name": "guardianlink-notification-engine",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Reliable notification and escalation: outbox, idempotency, retries, dead-letter handling and provider failover.",
+  "license": "MIT",
+  "type": "module",
+  "engines": { "node": ">=20.11.0" },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "lint": "eslint src --ext .ts",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "verify": "pnpm lint && pnpm typecheck && pnpm test"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.5",
+    "@typescript-eslint/eslint-plugin": "^8.20.0",
+    "@typescript-eslint/parser": "^8.20.0",
+    "eslint": "^8.57.1",
+    "typescript": "^5.7.3",
+    "vitest": "^2.1.8"
+  }
+}

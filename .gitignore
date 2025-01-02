@@ -1,0 +1,40 @@
+node_modules/
+dist/
+build/
+coverage/
+*.tsbuildinfo
+
+# Environment and secrets - never commit any of these
+.env
+.env.*
+!.env.example
+*.pem
+*.p12
+*.p8
+*.key
+*.keystore
+*.jks
+*.mobileprovision
+*.cer
+google-services.json
+GoogleService-Info.plist
+AuthKey_*.p8
+service-account*.json
+secrets/
+
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# iOS
+build/
+DerivedData/
+*.xcuserstate
+**/xcuserdata/
+
+# Android
+.gradle/
+local.properties
+*.apk
+*.aab
