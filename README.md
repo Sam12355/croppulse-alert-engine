@@ -1,0 +1,169 @@
+# guardianlink-notification-engine
+
+**Getting a message to a person, reliably, exactly once as far as they can tell, when the
+provider is down and the queue delivers twice.**
+
+> Part of the [GuardianLink portfolio](../PORTFOLIO.md). A demonstration, not a real
+> safety service.
+
+[![tests](https://img.shields.io/badge/tests-44%20passing-brightgreen)](docs/test-results/)
+[![licence](https://img.shields.io/badge/licence-MIT-blue)](LICENSE)
+
+---
+
+## The problem
+
+Sending an email is easy. Everything after that is not:
+
+- The queue delivers at least once, so a worker sees the same message twice as a matter of
+  routine, not as an error.
+- A worker can crash after sending and before recording that it sent.
+- Providers go down, rate limit, and occasionally accept a message and drop it.
+- A retry storm during an outage hits the recovering provider with the whole backlog at
+  once, turning a brief outage into a long one.
+- An operator replaying a dead-lettered message must not wake somebody up a second time.
+- A contact who has already replied must not receive the escalation that was queued a
+  second before they did.
+
+Every one of those has a mechanism here, and a test named after the failure it prevents.
+
+## The design
+
+```mermaid
+flowchart LR
+    APP["Business transaction"] -->|"same COMMIT"| OUTBOX[("Outbox")]
+    OUTBOX -->|"SKIP LOCKED"| RELAY["Relay"]
+    RELAY --> QUEUE["Queue"]
+    QUEUE --> WORKER["Worker"]
+    WORKER --> DEDUPE{"dedupe key<br/>incident + contact"}
+    DEDUPE -->|"already sent"| DROP["No-op"]
+    DEDUPE -->|"new"| SEND["Provider"]
+    SEND -->|"5xx or 429"| RETRY["Backoff with jitter"]
+    RETRY --> QUEUE
+    SEND -->|"4xx"| DLQ["Dead letter"]
+    RETRY -->|"budget exhausted"| DLQ
+    DLQ -->|"manual replay"| DEDUPE
+```
+
+### Transactional outbox
+
+Business state and the intent to send commit together. The relay publishes afterwards and
+can fail and retry without losing the message. It cannot publish for a transaction that
+rolled back, and a committed transaction cannot end up with no message queued.
+
+### Deduplication where it matters
+
+The dedupe key is incident plus contact, and it is checked **immediately before sending**,
+not when the message is scheduled. That ordering is the whole point: a message can sit on a
+queue for minutes, and the recipient may have acknowledged meanwhile.
+
+This is what makes at-least-once queue delivery invisible to the person receiving the
+message, and what makes replaying a dead-lettered message safe. A test sends the same
+message five times and asserts one delivery.
+
+### Retry with jitter
+
+Exponential backoff, capped at ten minutes, with **full jitter** by default.
+
+Jitter is not an optimisation. Without it, every message that failed during one outage
+retries at the same instant and the recovering provider gets the entire backlog in a
+spike. Randomness is injected rather than taken from `Math.random()`, so the schedule is
+asserted in tests instead of described in a comment.
+
+### Failure classification
+
+| Response | Class | Behaviour |
+|----------|-------|-----------|
+| 5xx, 408, 425 | transient | Retry with backoff |
+| 429 | throttled | Honour `Retry-After`, capped at the ceiling |
+| Other 4xx | permanent | Dead-letter immediately, no retries |
+
+Getting this wrong costs in both directions. Treating a transient failure as permanent
+loses a message that would have gone through. Treating a permanent one as transient burns
+five attempts on an address that does not exist and delays the dead-letter that would have
+told somebody the contact details are wrong.
+
+### Escalation
+
+Notify the primary contact. If nobody acknowledges within the window, bring in the next
+one. Stop the moment anybody answers.
+
+Three details that took thought:
+
+- **The window runs from the last send, not from the incident.** A slow first delivery must
+  not eat the time the primary contact actually had.
+- **Any acknowledgement stops the chain**, from anyone. The point is to reach somebody, and
+  somebody has been reached.
+- **A dead-lettered delivery counts as contacted.** Retrying it is the retry loop's job;
+  the chain should move on rather than stall waiting for a message that will not arrive.
+
+There is a step limit, so an account with twenty contacts does not wake all of them at 3am.
+
+### Per-recipient rate limiting
+
+Separate from the API rate limit and aimed at a different failure: a bug, or a genuine
+burst of incidents, becoming a stream of messages to one person's phone. A cap per
+recipient per hour bounds the worst case regardless of the cause.
+
+## Running it
+
+```bash
+pnpm install
+pnpm verify        # lint, type-check, tests
+```
+
+Nothing external. Time and randomness are both injected, so the backoff schedule and the
+escalation windows are asserted directly rather than waited out.
+
+## Test coverage
+
+44 tests, all passing.
+
+| Area | Cases |
+|------|-------|
+| Backoff | Exponential growth, ceiling, full jitter spread, equal jitter floor, zero before first retry |
+| Classification | Ten status codes across all three classes |
+| Retry decisions | Transient retried, permanent never retried, budget exhaustion, `Retry-After` honoured and capped, full walk to dead-letter |
+| Deduplication | First send, repeat suppressed, in-flight suppressed, dead-letter replay allowed, acknowledged never re-sent, per-incident scoping, five replays produce one delivery |
+| Escalation | Immediate primary, window wait, escalation on silence, window measured from last send, stop on acknowledgement from anyone, step limit, no contacts, dead-lettered counts as contacted, priority order, full chain |
+| Rate limiting | Under cap, at cap, aged-out sends ignored |
+
+Recorded output: [docs/test-results/](docs/test-results/).
+
+## Deliberately not here
+
+Incidents, users, maps, mobile apps, operator UI. This service takes a request and reports
+an outcome; recipients are opaque identifiers. If it is not about delivery reliability, it
+does not belong.
+
+## Known limitations
+
+- **No real provider is called.** Adapters for SES, SNS, APNs and FCM are written against
+  one interface; none has ever been exercised against a live account, and no delivery-rate
+  figure appears anywhere in this repository.
+- **No published performance numbers.** A load script exists. Running it against mock
+  providers would measure the mock, so no throughput figure is claimed.
+- **Escalation is time-based, not adaptive.** A fixed window per step. A real product would
+  tune this per contact and per time of day.
+- **The outbox relay is polling, not listening.** `LISTEN`/`NOTIFY` would cut latency; at
+  a two-second poll interval it has not been worth it.
+- **No template rendering engine.** Templates are versioned and a delivery records which
+  version produced it; the renderer itself is a string interpolation.
+
+## Further reading
+
+[docs/RELIABILITY.md](docs/RELIABILITY.md) covers the delivery guarantees, what "exactly
+once" actually means here, and where the guarantees stop.
+
+## Suggested repository metadata
+
+**Description:** Notification and escalation service: transactional outbox, idempotency,
+jittered retries, dead-letter replay and provider failover, with tests for every failure
+mode.
+
+**Topics:** `typescript` `reliability` `outbox-pattern` `idempotency` `retry` `dead-letter`
+`distributed-systems` `observability` `portfolio`
+
+## Licence
+
+[MIT](LICENSE).

@@ -1,0 +1,29 @@
+version: 2
+
+# Grouped so a week of patch updates arrives as one reviewable pull request rather than
+# fifteen. Ungrouped Dependabot is the fastest way to teach a team to ignore Dependabot.
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      production-patch:
+        dependency-type: production
+        update-types: [patch]
+      development:
+        dependency-type: development
+        update-types: [minor, patch]
+    labels: [dependencies]
+    commit-message:
+      prefix: build
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    labels: [dependencies, ci]
+    commit-message:
+      prefix: ci
