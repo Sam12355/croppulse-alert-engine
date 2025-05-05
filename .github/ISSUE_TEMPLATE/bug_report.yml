@@ -1,0 +1,79 @@
+name: Bug report
+description: Something behaves differently from how it is documented
+labels: [bug, needs-triage]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        GuardianLink is a portfolio demonstration, not a real safety service. Please do
+        not include real personal information, real location data, or a real access
+        token in this report. If you have a correlation id from an error screen, that is
+        the most useful thing you can give us and it identifies nobody.
+
+  - type: input
+    id: correlation
+    attributes:
+      label: Correlation id
+      description: Shown on any error screen and returned in the X-Correlation-Id header.
+      placeholder: 3f2a1c4e-...
+    validations:
+      required: false
+
+  - type: dropdown
+    id: surface
+    attributes:
+      label: Where did this happen
+      options:
+        - API
+        - Web user portal
+        - Web operator console
+        - iOS app
+        - Android app
+        - Local setup or tooling
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened instead
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: Numbered, starting from a clean checkout or a clean app install.
+      value: |
+        1.
+        2.
+        3.
+    validations:
+      required: true
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: Output of `node --version`, `pnpm --version`, OS, and device or browser.
+      render: shell
+    validations:
+      required: false
+
+  - type: checkboxes
+    id: hygiene
+    attributes:
+      label: Before submitting
+      options:
+        - label: This report contains no real personal data, location data or credentials
+          required: true
+        - label: I checked the known limitations section of the README
+          required: false
