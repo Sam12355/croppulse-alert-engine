@@ -1,0 +1,63 @@
+name: Feature request
+description: Propose something the product should do
+labels: [enhancement, needs-spec]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        The workflow here is specification first. This template collects the same
+        information a spec in `docs/specs/` needs, so an accepted request can become one
+        without a second round of questions.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: The problem
+      description: Describe the situation a person is in, not the feature you want built.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behaviour
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Each one checkable by running or reading something specific.
+      value: |
+        - [ ]
+        - [ ]
+    validations:
+      required: true
+
+  - type: textarea
+    id: security
+    attributes:
+      label: Security and privacy considerations
+      description: |
+        What new data does this collect, who can see it, how long is it kept, and what
+        new authorisation decision does it introduce. If the answer is "none", say so
+        explicitly rather than leaving it blank.
+    validations:
+      required: true
+
+  - type: dropdown
+    id: surfaces
+    attributes:
+      label: Which surfaces are affected
+      multiple: true
+      options: [API, Web portal, Operator console, iOS, Android, Infrastructure, Docs]
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: What else you considered, and why this instead
+    validations:
+      required: false

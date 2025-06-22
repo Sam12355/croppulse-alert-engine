@@ -6,7 +6,7 @@ provider is down and the queue delivers twice.**
 > Part of the [GuardianLink portfolio](../PORTFOLIO.md). A demonstration, not a real
 > safety service.
 
-[![tests](https://img.shields.io/badge/tests-44%20passing-brightgreen)](docs/test-results/)
+[![tests](https://img.shields.io/badge/tests-58%20passing-brightgreen)](docs/test-results/)
 [![licence](https://img.shields.io/badge/licence-MIT-blue)](LICENSE)
 
 ---
@@ -109,15 +109,19 @@ recipient per hour bounds the worst case regardless of the cause.
 
 ```bash
 pnpm install
-pnpm verify        # lint, type-check, tests
+pnpm verify        # lint, type-check, 58 tests
+pnpm dev           # http://localhost:3003
 ```
 
-Nothing external. Time and randomness are both injected, so the backoff schedule and the
-escalation windows are asserted directly rather than waited out.
+Nothing external. Time and randomness are injected, so backoff schedules and escalation
+windows are asserted directly rather than waited out.
+
+`docker compose up -d` starts Postgres and Redis for driving it against real backing stores.
 
 ## Test coverage
 
-44 tests, all passing.
+58 tests, all passing: 44 unit tests over the decision logic and 14 that drive the same
+rules over real HTTP against the running service.
 
 | Area | Cases |
 |------|-------|
@@ -127,6 +131,7 @@ escalation windows are asserted directly rather than waited out.
 | Deduplication | First send, repeat suppressed, in-flight suppressed, dead-letter replay allowed, acknowledged never re-sent, per-incident scoping, five replays produce one delivery |
 | Escalation | Immediate primary, window wait, escalation on silence, window measured from last send, stop on acknowledgement from anyone, step limit, no contacts, dead-lettered counts as contacted, priority order, full chain |
 | Rate limiting | Under cap, at cap, aged-out sends ignored |
+| Over HTTP | Escalation chain end to end, repeated drains sending once, retry then success, permanent failure dead-lettered immediately, dead-letter listing and safe replay, acknowledgement suppressing a replay, delivery endpoint exposing no contact details |
 
 Recorded output: [docs/test-results/](docs/test-results/).
 
@@ -138,9 +143,9 @@ does not belong.
 
 ## Known limitations
 
-- **No real provider is called.** Adapters for SES, SNS, APNs and FCM are written against
-  one interface; none has ever been exercised against a live account, and no delivery-rate
-  figure appears anywhere in this repository.
+- **No real provider is called.** The adapter interface is here with a mock implementation;
+  SES, SNS, APNs and FCM implementations are in the flagship and none has ever been
+  exercised against a live account. No delivery-rate figure appears anywhere here.
 - **No published performance numbers.** A load script exists. Running it against mock
   providers would measure the mock, so no throughput figure is claimed.
 - **Escalation is time-based, not adaptive.** A fixed window per step. A real product would

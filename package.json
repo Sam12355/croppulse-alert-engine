@@ -4,15 +4,20 @@
   "private": true,
   "description": "Reliable notification and escalation: outbox, idempotency, retries, dead-letter handling and provider failover.",
   "license": "MIT",
-  "type": "module",
-  "engines": { "node": ">=20.11.0" },
+  "engines": {
+    "node": ">=20.11.0"
+  },
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "build": "nest build",
+    "start": "node dist/main.js",
+    "dev": "nest start --watch",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "lint": "eslint src --ext .ts",
-    "test": "vitest run",
-    "test:watch": "vitest",
-    "verify": "pnpm lint && pnpm typecheck && pnpm test"
+    "test": "jest --config jest.config.js",
+    "test:watch": "jest --config jest.config.js --watch",
+    "verify": "pnpm lint && pnpm typecheck && pnpm test",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down -v"
   },
   "devDependencies": {
     "@types/node": "^22.10.5",
@@ -20,6 +25,28 @@
     "@typescript-eslint/parser": "^8.20.0",
     "eslint": "^8.57.1",
     "typescript": "^5.7.3",
-    "vitest": "^2.1.8"
+    "@nestjs/cli": "^10.4.9",
+    "@nestjs/testing": "^10.4.15",
+    "@types/jest": "^29.5.14",
+    "@types/pg": "^8.11.10",
+    "@types/supertest": "^6.0.2",
+    "jest": "^29.7.0",
+    "supertest": "^7.0.0",
+    "ts-jest": "^29.2.5",
+    "ts-node": "^10.9.2",
+    "socket.io-client": "^4.8.1"
+  },
+  "dependencies": {
+    "@nestjs/common": "^10.4.15",
+    "@nestjs/core": "^10.4.15",
+    "@nestjs/platform-express": "^10.4.15",
+    "@nestjs/platform-socket.io": "^10.4.15",
+    "@nestjs/websockets": "^10.4.15",
+    "ioredis": "^5.4.2",
+    "pg": "^8.13.1",
+    "reflect-metadata": "^0.2.2",
+    "rxjs": "^7.8.1",
+    "socket.io": "^4.8.1",
+    "zod": "^3.24.1"
   }
 }
