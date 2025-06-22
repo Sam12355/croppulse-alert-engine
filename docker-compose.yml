@@ -1,0 +1,47 @@
+# Local stack for the notification engine.
+#
+#   docker compose up -d
+#
+# You do not need any of this to run the tests. The default adapters are in-memory and
+# `pnpm test` touches none of these services. This is here for driving the thing by hand
+# against real backing stores.
+
+name: guardianlink-notification-engine
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: guardianlink
+      POSTGRES_PASSWORD: guardianlink
+      POSTGRES_DB: guardianlink
+    ports: ['5432:5432']
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U guardianlink']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    # Persistence off deliberately. Everything Redis holds here is disposable, and
+    # pretending otherwise hides bugs.
+    command: ['redis-server', '--save', '', '--appendonly', 'no']
+    ports: ['6379:6379']
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  service:
+    build: .
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis: { condition: service_healthy }
+    environment:
+      NODE_ENV: development
+      PORT: '3003'
+      DATABASE_URL: postgres://guardianlink:guardianlink@postgres:5432/guardianlink
+      REDIS_URL: redis://redis:6379
+    ports: ['3003:3003']
