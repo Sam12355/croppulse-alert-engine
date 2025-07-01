@@ -21,7 +21,7 @@ import {
   nextEscalationStep,
   shouldSend,
   withinRecipientLimit,
-  type Contact,
+  type Recipient,
   type DeliveryRecord,
 } from './escalation';
 import { DEFAULT_POLICY, classify, decide, type FailureClass } from './retry';
@@ -53,8 +53,8 @@ export interface Random {
 
 export interface OutboxMessage {
   readonly id: string;
-  readonly incidentId: string;
-  readonly contactId: string;
+  readonly alertId: string;
+  readonly recipientId: string;
   readonly dedupeKey: string;
   readonly attempts: number;
   readonly nextAttemptAt: number | null;
@@ -63,10 +63,10 @@ export interface OutboxMessage {
 }
 
 export interface NotificationStore {
-  contacts(incidentId: string): Promise<Contact[]>;
-  deliveries(incidentId: string): Promise<DeliveryRecord[]>;
-  recordDelivery(incidentId: string, record: DeliveryRecord): Promise<void>;
-  acknowledge(incidentId: string, contactId: string, at: number): Promise<boolean>;
+  recipients(alertId: string): Promise<Recipient[]>;
+  deliveries(alertId: string): Promise<DeliveryRecord[]>;
+  recordDelivery(alertId: string, record: DeliveryRecord): Promise<void>;
+  acknowledge(alertId: string, recipientId: string, at: number): Promise<boolean>;
 
   enqueue(message: OutboxMessage): Promise<void>;
   claimDue(now: number, limit: number): Promise<OutboxMessage[]>;
@@ -74,59 +74,59 @@ export interface NotificationStore {
   markFailed(id: string, error: string, nextAttemptAt: number | null, deadLettered: boolean): Promise<void>;
   deadLettered(): Promise<OutboxMessage[]>;
 
-  sentTimestampsFor(contactId: string): Promise<number[]>;
+  sentTimestampsFor(recipientId: string): Promise<number[]>;
 }
 
 export interface ChannelAdapter {
-  readonly channel: Contact['channel'];
+  readonly channel: Recipient['channel'];
   /** Returns an HTTP-like status so the classifier has something to work with. */
-  send(contactId: string, incidentId: string): Promise<number>;
+  send(recipientId: string, alertId: string): Promise<number>;
 }
 
 // --- In-memory store -------------------------------------------------------------------
 
 @Injectable()
 export class MemoryNotificationStore implements NotificationStore {
-  private readonly contactsByIncident = new Map<string, Contact[]>();
-  private readonly deliveriesByIncident = new Map<string, DeliveryRecord[]>();
+  private readonly recipientsByAlert = new Map<string, Recipient[]>();
+  private readonly deliveriesByAlert = new Map<string, DeliveryRecord[]>();
   private readonly outbox = new Map<string, OutboxMessage>();
   private readonly sentAt = new Map<string, number[]>();
 
-  seedContacts(incidentId: string, contacts: Contact[]): void {
-    this.contactsByIncident.set(incidentId, contacts);
+  seedRecipients(alertId: string, recipients: Recipient[]): void {
+    this.recipientsByAlert.set(alertId, recipients);
   }
 
-  async contacts(incidentId: string): Promise<Contact[]> {
-    return this.contactsByIncident.get(incidentId) ?? [];
+  async recipients(alertId: string): Promise<Recipient[]> {
+    return this.recipientsByAlert.get(alertId) ?? [];
   }
 
-  async deliveries(incidentId: string): Promise<DeliveryRecord[]> {
-    return this.deliveriesByIncident.get(incidentId) ?? [];
+  async deliveries(alertId: string): Promise<DeliveryRecord[]> {
+    return this.deliveriesByAlert.get(alertId) ?? [];
   }
 
-  async recordDelivery(incidentId: string, record: DeliveryRecord): Promise<void> {
-    const existing = this.deliveriesByIncident.get(incidentId) ?? [];
+  async recordDelivery(alertId: string, record: DeliveryRecord): Promise<void> {
+    const existing = this.deliveriesByAlert.get(alertId) ?? [];
     const without = existing.filter((entry) => entry.dedupeKey !== record.dedupeKey);
-    this.deliveriesByIncident.set(incidentId, [...without, record]);
+    this.deliveriesByAlert.set(alertId, [...without, record]);
 
     // Only successful sends count towards the per-recipient cap. A suppressed or
     // dead-lettered attempt never reached anybody, so it should not push a later real
     // message over the limit.
     if (record.status === 'sent' && record.sentAt !== null) {
-      const timestamps = this.sentAt.get(record.contactId) ?? [];
-      this.sentAt.set(record.contactId, [...timestamps, record.sentAt]);
+      const timestamps = this.sentAt.get(record.recipientId) ?? [];
+      this.sentAt.set(record.recipientId, [...timestamps, record.sentAt]);
     }
   }
 
-  async acknowledge(incidentId: string, contactId: string, at: number): Promise<boolean> {
-    const existing = this.deliveriesByIncident.get(incidentId) ?? [];
-    const target = existing.find((entry) => entry.contactId === contactId);
+  async acknowledge(alertId: string, recipientId: string, at: number): Promise<boolean> {
+    const existing = this.deliveriesByAlert.get(alertId) ?? [];
+    const target = existing.find((entry) => entry.recipientId === recipientId);
     if (target === undefined) return false;
 
-    this.deliveriesByIncident.set(
-      incidentId,
+    this.deliveriesByAlert.set(
+      alertId,
       existing.map((entry) =>
-        entry.contactId === contactId ? { ...entry, acknowledgedAt: at } : entry,
+        entry.recipientId === recipientId ? { ...entry, acknowledgedAt: at } : entry,
       ),
     );
     return true;
@@ -169,8 +169,8 @@ export class MemoryNotificationStore implements NotificationStore {
     return [...this.outbox.values()].filter((message) => message.deadLettered);
   }
 
-  async sentTimestampsFor(contactId: string): Promise<number[]> {
-    return this.sentAt.get(contactId) ?? [];
+  async sentTimestampsFor(recipientId: string): Promise<number[]> {
+    return this.sentAt.get(recipientId) ?? [];
   }
 }
 
@@ -189,7 +189,7 @@ export class MockChannelAdapter implements ChannelAdapter {
   private calls = 0;
 
   constructor(
-    readonly channel: Contact['channel'],
+    readonly channel: Recipient['channel'],
     /** Statuses to return in order, then 200 for ever. Drives the retry tests. */
     private readonly script: number[] = [],
   ) {}
@@ -214,15 +214,15 @@ export class DispatchService {
     @Inject(RANDOM) private readonly random: Random,
   ) {}
 
-  /** Schedules the next contact in the chain, if it is time for one. */
+  /** Schedules the next recipient in the chain, if it is time for one. */
   async advanceEscalation(
-    incidentId: string,
+    alertId: string,
     activatedAt: number,
-  ): Promise<{ action: string; contactId?: string; untilMs?: number }> {
+  ): Promise<{ action: string; recipientId?: string; untilMs?: number }> {
     const decision = nextEscalationStep({
-      contacts: await this.store.contacts(incidentId),
-      deliveries: await this.store.deliveries(incidentId),
-      incidentActivatedAt: activatedAt,
+      recipients: await this.store.recipients(alertId),
+      deliveries: await this.store.deliveries(alertId),
+      alertActivatedAt: activatedAt,
       now: this.clock.now(),
       config: DEFAULT_ESCALATION,
     });
@@ -234,17 +234,17 @@ export class DispatchService {
     }
 
     await this.store.enqueue({
-      id: `${incidentId}:${decision.contact.id}`,
-      incidentId,
-      contactId: decision.contact.id,
-      dedupeKey: dedupeKey(incidentId, decision.contact.id),
+      id: `${alertId}:${decision.recipient.id}`,
+      alertId,
+      recipientId: decision.recipient.id,
+      dedupeKey: dedupeKey(alertId, decision.recipient.id),
       attempts: 0,
       nextAttemptAt: null,
       deadLettered: false,
       lastError: null,
     });
 
-    return { action: 'notify', contactId: decision.contact.id };
+    return { action: 'notify', recipientId: decision.recipient.id };
   }
 
   /** One pass over the queue. Returns what it did so a caller can log a real number. */
@@ -271,7 +271,7 @@ export class DispatchService {
   private async send(
     message: OutboxMessage,
   ): Promise<'sent' | 'suppressed' | 'retried' | 'dead-lettered'> {
-    const existing = await this.store.deliveries(message.incidentId);
+    const existing = await this.store.deliveries(message.alertId);
 
     // Checked here, immediately before sending, not when the message was scheduled. This
     // is the branch that makes a replay safe and makes at-least-once queue delivery
@@ -282,11 +282,11 @@ export class DispatchService {
       return 'suppressed';
     }
 
-    const timestamps = await this.store.sentTimestampsFor(message.contactId);
+    const timestamps = await this.store.sentTimestampsFor(message.recipientId);
     if (!withinRecipientLimit(timestamps, this.clock.now())) {
       await this.store.markPublished(message.id);
-      await this.store.recordDelivery(message.incidentId, {
-        contactId: message.contactId,
+      await this.store.recordDelivery(message.alertId, {
+        recipientId: message.recipientId,
         dedupeKey: message.dedupeKey,
         status: 'suppressed',
         sentAt: this.clock.now(),
@@ -295,18 +295,18 @@ export class DispatchService {
       return 'suppressed';
     }
 
-    const contacts = await this.store.contacts(message.incidentId);
-    const contact = contacts.find((entry) => entry.id === message.contactId);
-    const adapter = this.adapters.find((entry) => entry.channel === (contact?.channel ?? 'sms'));
+    const recipients = await this.store.recipients(message.alertId);
+    const recipient = recipients.find((entry) => entry.id === message.recipientId);
+    const adapter = this.adapters.find((entry) => entry.channel === (recipient?.channel ?? 'sms'));
 
     const status = adapter === undefined
       ? 503
-      : await adapter.send(message.contactId, message.incidentId);
+      : await adapter.send(message.recipientId, message.alertId);
 
     if (status >= 200 && status < 300) {
       await this.store.markPublished(message.id);
-      await this.store.recordDelivery(message.incidentId, {
-        contactId: message.contactId,
+      await this.store.recordDelivery(message.alertId, {
+        recipientId: message.recipientId,
         dedupeKey: message.dedupeKey,
         status: 'sent',
         sentAt: this.clock.now(),
@@ -324,8 +324,8 @@ export class DispatchService {
 
     if (decision.action === 'dead-letter') {
       await this.store.markFailed(message.id, decision.reason, null, true);
-      await this.store.recordDelivery(message.incidentId, {
-        contactId: message.contactId,
+      await this.store.recordDelivery(message.alertId, {
+        recipientId: message.recipientId,
         dedupeKey: message.dedupeKey,
         status: 'dead_lettered',
         sentAt: this.clock.now(),
@@ -347,7 +347,7 @@ export class DispatchService {
    * Replays a dead-lettered message.
    *
    * Safe because it goes through the same dedupe check as a first attempt, and stops
-   * entirely if the contact has acknowledged in the meantime.
+   * entirely if the recipient has acknowledged in the meantime.
    */
   async replay(id: string): Promise<boolean> {
     const dead = await this.store.deadLettered();
@@ -362,7 +362,7 @@ export class DispatchService {
 // --- HTTP ------------------------------------------------------------------------------
 
 const escalateSchema = z.object({
-  incidentId: z.string().min(1),
+  alertId: z.string().min(1),
   activatedAt: z.number().int(),
 });
 
@@ -378,7 +378,7 @@ export class NotificationController {
   @HttpCode(200)
   async escalate(@Body() body: unknown) {
     const parsed = escalateSchema.parse(body);
-    return this.dispatch.advanceEscalation(parsed.incidentId, parsed.activatedAt);
+    return this.dispatch.advanceEscalation(parsed.alertId, parsed.activatedAt);
   }
 
   @Post('drain')
@@ -390,8 +390,8 @@ export class NotificationController {
   @Get('dead-letters')
   async deadLetters() {
     const messages = await this.store.deadLettered();
-    return { items: messages.map(({ id, incidentId, contactId, attempts, lastError }) => ({
-      id, incidentId, contactId, attempts, lastError,
+    return { items: messages.map(({ id, alertId, recipientId, attempts, lastError }) => ({
+      id, alertId, recipientId, attempts, lastError,
     })) };
   }
 
@@ -403,24 +403,24 @@ export class NotificationController {
     return { replayed: true };
   }
 
-  @Post('incidents/:incidentId/contacts/:contactId/acknowledge')
+  @Post('alerts/:alertId/recipients/:recipientId/acknowledge')
   @HttpCode(200)
   async acknowledge(
-    @Param('incidentId') incidentId: string,
-    @Param('contactId') contactId: string,
+    @Param('alertId') alertId: string,
+    @Param('recipientId') recipientId: string,
   ) {
-    const acknowledged = await this.store.acknowledge(incidentId, contactId, this.clock.now());
+    const acknowledged = await this.store.acknowledge(alertId, recipientId, this.clock.now());
     if (!acknowledged) throw new HttpException({ error: 'not_found' }, HttpStatus.NOT_FOUND);
     return { acknowledged: true };
   }
 
-  @Get('incidents/:incidentId/deliveries')
-  async deliveries(@Param('incidentId') incidentId: string) {
-    const records = await this.store.deliveries(incidentId);
+  @Get('alerts/:alertId/deliveries')
+  async deliveries(@Param('alertId') alertId: string) {
+    const records = await this.store.deliveries(alertId);
     // Identifiers and status only. No address, no number, no message body: this endpoint
     // is the one most likely to end up in a screenshot of a debugging session.
-    return { items: records.map(({ contactId, status, sentAt, acknowledgedAt }) => ({
-      contactId, status, sentAt, acknowledgedAt,
+    return { items: records.map(({ recipientId, status, sentAt, acknowledgedAt }) => ({
+      recipientId, status, sentAt, acknowledgedAt,
     })) };
   }
 }

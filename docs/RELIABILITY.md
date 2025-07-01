@@ -39,11 +39,11 @@ sequenceDiagram
 ### Business transaction to outbox
 
 **Guarantee: exact.** Same transaction, same commit. There is no interleaving in which the
-incident exists and the message does not, or the reverse.
+alert exists and the message does not, or the reverse.
 
 This is the single most valuable property in the chain, and it is why the outbox exists
-rather than publishing directly from the request handler. A user who triggered SOS believes
-help is coming; an incident with no notification queued produces confidence with nothing
+rather than publishing directly from the request handler. A user who triggered crop alert believes
+help is coming; an alert with no notification queued produces confidence with nothing
 behind it.
 
 ### Outbox to queue
@@ -64,7 +64,7 @@ Visibility timeout reduces the window; it does not close it.
 
 **Guarantee: at least once, with an idempotent consumer in front of it.**
 
-The dedupe key is incident plus contact. It is checked immediately before sending, not
+The dedupe key is alert plus recipient. It is checked immediately before sending, not
 when the message is scheduled, because a message can wait on a queue for minutes and the
 recipient may have acknowledged in that time.
 
@@ -72,16 +72,16 @@ The residual window is real and worth naming: the worker can send successfully a
 before recording it. The next attempt sees no record and sends again. Closing that would
 need a distributed transaction with the provider, which providers do not offer. The window
 is milliseconds wide and the failure mode is one duplicate message, which is the correct
-side to fail on for a safety alert.
+side to fail on when a tank is running dry.
 
 ## Idempotency, layer by layer
 
 | Layer | Key | Scope |
 |-------|-----|-------|
 | API request | `Idempotency-Key` header | Per subject and route, 24 hours |
-| Incident activation | Unique index on `(user_id, key)` | For ever |
-| Notification delivery | `incident_id:contact_id` | Per incident |
-| Escalation step | Contact already in the delivery set | Per incident |
+| Alert activation | Unique index on `(user_id, key)` | For ever |
+| Notification delivery | `alert_id:recipient_id` | Per alert |
+| Escalation step | Recipient already in the delivery set | Per alert |
 
 Four layers because each covers a case the others do not. The API key covers a client
 retry. The unique index covers two concurrent retries that both miss the lookup. The
@@ -103,7 +103,7 @@ outage lasts longer than the original fault.
 Randomness is injected, so the schedule is asserted in tests rather than described.
 
 Permanent failures are not retried at all. Five attempts at an address that does not exist
-burns the budget and delays the dead-letter that would have told somebody the contact
+burns the budget and delays the dead-letter that would have told somebody the recipient
 details are wrong.
 
 ## Dead letters
@@ -112,7 +112,7 @@ After the attempt budget, or immediately on a permanent failure, the message is 
 the dead-letter queue **with its failure history**. Not dropped, not retried for ever.
 
 Replay is manual and deliberate. It is safe because the dedupe check runs on the replay
-path exactly as it does on the first attempt, and it stops entirely if the contact has
+path exactly as it does on the first attempt, and it stops entirely if the recipient has
 acknowledged in the meantime. Both have tests.
 
 A non-empty dead-letter queue is one of only two alarms in this portfolio that would wake
@@ -124,8 +124,8 @@ than to a dashboard.
 
 **There is no ordering guarantee, and none is needed.**
 
-Notifications to different contacts are independent. Notifications to the same contact for
-the same incident are deduplicated to one. Escalation ordering is enforced by the decision
+Notifications to different recipients are independent. Notifications to the same recipient for
+the same alert are deduplicated to one. Escalation ordering is enforced by the decision
 function, which reads current state rather than assuming messages arrive in the order they
 were scheduled.
 
@@ -138,7 +138,7 @@ until the day the queue reorders, and then fails in a way that is very hard to d
   status updates would narrow the gap; they are not implemented.
 - **Latency.** No SLA is claimed. Nothing has been measured against a real provider, so no
   number appears anywhere in this repository.
-- **Ordering between contacts.** As above, by design.
+- **Ordering between recipients.** As above, by design.
 - **Delivery when every provider is down.** Failover switches between configured providers.
   If all of them are unavailable, messages accumulate in the queue and the backlog alarm
   fires. There is no fallback that does not involve a provider.
@@ -150,6 +150,6 @@ the queue, the worker, the provider call and every log line. One search reconstr
 whole path.
 
 Metrics that would matter in a deployment: outbox depth, dead-letter depth, attempts per
-delivery, time from incident activation to first successful send, and acknowledgement rate
-per contact position. Only the first two are wired to alarms, because the rest are
+delivery, time from alert activation to first successful send, and acknowledgement rate
+per recipient position. Only the first two are wired to alarms, because the rest are
 diagnostic rather than actionable.

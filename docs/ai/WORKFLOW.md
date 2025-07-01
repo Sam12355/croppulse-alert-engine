@@ -26,7 +26,7 @@ flowchart TB
 
 ## 1. The product request
 
-One paragraph describing a situation a person is in. Not a feature description. "A contact who
+One paragraph describing a situation a person is in. Not a feature description. "A recipient who
 misses the first alert should get a second one" is a request; "add an escalation service" is already
 a solution and forecloses the design conversation.
 
@@ -69,8 +69,8 @@ would say.
 ```bash
 pnpm lint
 pnpm typecheck
-pnpm --filter @guardianlink/api test
-pnpm --filter @guardianlink/api test:e2e
+pnpm --filter @croppulse/api test
+pnpm --filter @croppulse/api test:e2e
 ```
 
 A failing test is fixed by understanding the cause. Changing the assertion so it passes is the single

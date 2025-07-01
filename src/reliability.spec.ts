@@ -6,22 +6,22 @@ import {
   nextEscalationStep,
   shouldSend,
   withinRecipientLimit,
-  type Contact,
+  type Recipient,
   type DeliveryRecord,
 } from './escalation';
 import { DEFAULT_POLICY, backoffMs, classify, decide } from './retry';
 
 const NOW = 1_773_000_000_000;
 
-const contacts: Contact[] = [
+const recipients: Recipient[] = [
   { id: 'primary', priority: 1, channel: 'sms' },
   { id: 'secondary', priority: 2, channel: 'sms' },
   { id: 'tertiary', priority: 3, channel: 'email' },
 ];
 
-function delivery(overrides: Partial<DeliveryRecord> & { contactId: string }): DeliveryRecord {
+function delivery(overrides: Partial<DeliveryRecord> & { recipientId: string }): DeliveryRecord {
   return {
-    dedupeKey: dedupeKey('incident-1', overrides.contactId),
+    dedupeKey: dedupeKey('alert-1', overrides.recipientId),
     status: 'sent',
     sentAt: NOW,
     acknowledgedAt: null,
@@ -90,7 +90,7 @@ describe('retry decisions', () => {
 
   it('never retries a permanent failure', () => {
     // Five attempts at an address that does not exist wastes the budget and delays the
-    // point at which somebody notices the contact details are wrong.
+    // point at which somebody notices the recipient details are wrong.
     const decision = decide(DEFAULT_POLICY, { attempt: 1, failure: 'permanent' }, 0.5);
     expect(decision.action).toBe('dead-letter');
   });
@@ -152,16 +152,16 @@ describe('retry decisions', () => {
 });
 
 describe('deduplication', () => {
-  it('sends when this contact has not been contacted for this incident', () => {
-    expect(shouldSend({ dedupeKey: dedupeKey('incident-1', 'primary'), existing: [] }).send).toBe(
+  it('sends when this recipient has not been contacted for this alert', () => {
+    expect(shouldSend({ dedupeKey: dedupeKey('alert-1', 'primary'), existing: [] }).send).toBe(
       true,
     );
   });
 
-  it('does not send twice for the same incident and contact', () => {
+  it('does not send twice for the same alert and recipient', () => {
     const result = shouldSend({
-      dedupeKey: dedupeKey('incident-1', 'primary'),
-      existing: [delivery({ contactId: 'primary', status: 'sent' })],
+      dedupeKey: dedupeKey('alert-1', 'primary'),
+      existing: [delivery({ recipientId: 'primary', status: 'sent' })],
     });
 
     // The branch that makes at-least-once queue delivery invisible to the person
@@ -171,25 +171,25 @@ describe('deduplication', () => {
 
   it('does not send while an earlier attempt is still in flight', () => {
     const result = shouldSend({
-      dedupeKey: dedupeKey('incident-1', 'primary'),
-      existing: [delivery({ contactId: 'primary', status: 'pending' })],
+      dedupeKey: dedupeKey('alert-1', 'primary'),
+      existing: [delivery({ recipientId: 'primary', status: 'pending' })],
     });
     expect(result.send).toBe(false);
   });
 
   it('allows a deliberate replay of a dead-lettered delivery', () => {
     const result = shouldSend({
-      dedupeKey: dedupeKey('incident-1', 'primary'),
-      existing: [delivery({ contactId: 'primary', status: 'dead_lettered' })],
+      dedupeKey: dedupeKey('alert-1', 'primary'),
+      existing: [delivery({ recipientId: 'primary', status: 'dead_lettered' })],
     });
     expect(result.send).toBe(true);
   });
 
   it('does not send to someone who has already acknowledged', () => {
     const result = shouldSend({
-      dedupeKey: dedupeKey('incident-1', 'primary'),
+      dedupeKey: dedupeKey('alert-1', 'primary'),
       existing: [
-        delivery({ contactId: 'primary', status: 'dead_lettered', acknowledgedAt: NOW }),
+        delivery({ recipientId: 'primary', status: 'dead_lettered', acknowledgedAt: NOW }),
       ],
     });
 
@@ -198,23 +198,23 @@ describe('deduplication', () => {
     expect(result.send).toBe(false);
   });
 
-  it('scopes the key to one incident, so a second incident does notify the same person', () => {
+  it('scopes the key to one alert, so a second alert does notify the same person', () => {
     const result = shouldSend({
-      dedupeKey: dedupeKey('incident-2', 'primary'),
-      existing: [delivery({ contactId: 'primary', status: 'sent' })],
+      dedupeKey: dedupeKey('alert-2', 'primary'),
+      existing: [delivery({ recipientId: 'primary', status: 'sent' })],
     });
     expect(result.send).toBe(true);
   });
 
   it('replaying the same message twice produces one user-visible notification', () => {
     const existing: DeliveryRecord[] = [];
-    const key = dedupeKey('incident-1', 'primary');
+    const key = dedupeKey('alert-1', 'primary');
 
     let sent = 0;
     for (let replay = 0; replay < 5; replay += 1) {
       if (shouldSend({ dedupeKey: key, existing }).send) {
         sent += 1;
-        existing.push(delivery({ contactId: 'primary', status: 'sent' }));
+        existing.push(delivery({ recipientId: 'primary', status: 'sent' }));
       }
     }
 
@@ -223,25 +223,25 @@ describe('deduplication', () => {
 });
 
 describe('escalation', () => {
-  it('notifies the primary contact immediately', () => {
+  it('notifies the primary recipient immediately', () => {
     const decision = nextEscalationStep({
-      contacts,
+      recipients,
       deliveries: [],
-      incidentActivatedAt: NOW,
+      alertActivatedAt: NOW,
       now: NOW,
     });
 
     expect(decision.action).toBe('notify');
     if (decision.action !== 'notify') return;
-    expect(decision.contact.id).toBe('primary');
+    expect(decision.recipient.id).toBe('primary');
     expect(decision.step).toBe(0);
   });
 
   it('waits out the window before bringing in the secondary', () => {
     const decision = nextEscalationStep({
-      contacts,
-      deliveries: [delivery({ contactId: 'primary' })],
-      incidentActivatedAt: NOW,
+      recipients,
+      deliveries: [delivery({ recipientId: 'primary' })],
+      alertActivatedAt: NOW,
       now: NOW + 60_000,
     });
 
@@ -252,24 +252,24 @@ describe('escalation', () => {
 
   it('escalates once the window has elapsed with no acknowledgement', () => {
     const decision = nextEscalationStep({
-      contacts,
-      deliveries: [delivery({ contactId: 'primary' })],
-      incidentActivatedAt: NOW,
+      recipients,
+      deliveries: [delivery({ recipientId: 'primary' })],
+      alertActivatedAt: NOW,
       now: NOW + DEFAULT_ESCALATION.windowMs + 1,
     });
 
     expect(decision.action).toBe('notify');
     if (decision.action !== 'notify') return;
-    expect(decision.contact.id).toBe('secondary');
+    expect(decision.recipient.id).toBe('secondary');
   });
 
-  it('measures the window from the last send, not from the incident', () => {
-    // A slow first delivery must not eat the time the primary contact actually had.
+  it('measures the window from the last send, not from the alert', () => {
+    // A slow first delivery must not eat the time the primary recipient actually had.
     const lateSend = NOW + 120_000;
     const decision = nextEscalationStep({
-      contacts,
-      deliveries: [delivery({ contactId: 'primary', sentAt: lateSend })],
-      incidentActivatedAt: NOW,
+      recipients,
+      deliveries: [delivery({ recipientId: 'primary', sentAt: lateSend })],
+      alertActivatedAt: NOW,
       now: lateSend + 60_000,
     });
 
@@ -280,9 +280,9 @@ describe('escalation', () => {
 
   it('stops the moment anyone acknowledges', () => {
     const decision = nextEscalationStep({
-      contacts,
-      deliveries: [delivery({ contactId: 'primary', acknowledgedAt: NOW + 30_000 })],
-      incidentActivatedAt: NOW,
+      recipients,
+      deliveries: [delivery({ recipientId: 'primary', acknowledgedAt: NOW + 30_000 })],
+      alertActivatedAt: NOW,
       now: NOW + 600_000,
     });
 
@@ -291,14 +291,14 @@ describe('escalation', () => {
     expect(decision.reason).toBe('acknowledged');
   });
 
-  it('stops even when the acknowledgement came from a later contact', () => {
+  it('stops even when the acknowledgement came from a later recipient', () => {
     const decision = nextEscalationStep({
-      contacts,
+      recipients,
       deliveries: [
-        delivery({ contactId: 'primary' }),
-        delivery({ contactId: 'secondary', acknowledgedAt: NOW + 300_000 }),
+        delivery({ recipientId: 'primary' }),
+        delivery({ recipientId: 'secondary', acknowledgedAt: NOW + 300_000 }),
       ],
-      incidentActivatedAt: NOW,
+      alertActivatedAt: NOW,
       now: NOW + 900_000,
     });
 
@@ -306,18 +306,18 @@ describe('escalation', () => {
   });
 
   it('stops at the step limit rather than working through a list of twenty at 3am', () => {
-    const many: Contact[] = Array.from({ length: 10 }, (_unused, index) => ({
-      id: `contact-${index}`,
+    const many: Recipient[] = Array.from({ length: 10 }, (_unused, index) => ({
+      id: `recipient-${index}`,
       priority: index + 1,
       channel: 'sms' as const,
     }));
 
     const decision = nextEscalationStep({
-      contacts: many,
+      recipients: many,
       deliveries: many
         .slice(0, DEFAULT_ESCALATION.maxSteps)
-        .map((contact) => delivery({ contactId: contact.id })),
-      incidentActivatedAt: NOW,
+        .map((recipient) => delivery({ recipientId: recipient.id })),
+      alertActivatedAt: NOW,
       now: NOW + 3_600_000,
     });
 
@@ -328,9 +328,9 @@ describe('escalation', () => {
 
   it('stops when there is nobody left to escalate to', () => {
     const decision = nextEscalationStep({
-      contacts: [contacts[0] as Contact],
-      deliveries: [delivery({ contactId: 'primary' })],
-      incidentActivatedAt: NOW,
+      recipients: [recipients[0] as Recipient],
+      deliveries: [delivery({ recipientId: 'primary' })],
+      alertActivatedAt: NOW,
       now: NOW + 3_600_000,
     });
 
@@ -339,75 +339,75 @@ describe('escalation', () => {
     expect(decision.reason).toBe('exhausted');
   });
 
-  it('stops when the account has no contacts at all', () => {
+  it('stops when the account has no recipients at all', () => {
     const decision = nextEscalationStep({
-      contacts: [],
+      recipients: [],
       deliveries: [],
-      incidentActivatedAt: NOW,
+      alertActivatedAt: NOW,
       now: NOW,
     });
 
     expect(decision.action).toBe('stop');
     if (decision.action !== 'stop') return;
-    expect(decision.reason).toBe('no_contacts');
+    expect(decision.reason).toBe('no_recipients');
   });
 
   it('counts a dead-lettered delivery as contacted, so the chain moves on', () => {
     // Retrying that delivery is the retry loop's job. The chain's job is to reach
     // somebody else, and it should not stall waiting for a message that will not arrive.
     const decision = nextEscalationStep({
-      contacts,
-      deliveries: [delivery({ contactId: 'primary', status: 'dead_lettered' })],
-      incidentActivatedAt: NOW,
+      recipients,
+      deliveries: [delivery({ recipientId: 'primary', status: 'dead_lettered' })],
+      alertActivatedAt: NOW,
       now: NOW + DEFAULT_ESCALATION.windowMs + 1,
     });
 
     expect(decision.action).toBe('notify');
     if (decision.action !== 'notify') return;
-    expect(decision.contact.id).toBe('secondary');
+    expect(decision.recipient.id).toBe('secondary');
   });
 
   it('respects priority order rather than list order', () => {
     const decision = nextEscalationStep({
-      contacts: [
+      recipients: [
         { id: 'third', priority: 3, channel: 'sms' },
         { id: 'first', priority: 1, channel: 'sms' },
         { id: 'second', priority: 2, channel: 'sms' },
       ],
       deliveries: [],
-      incidentActivatedAt: NOW,
+      alertActivatedAt: NOW,
       now: NOW,
     });
 
     expect(decision.action).toBe('notify');
     if (decision.action !== 'notify') return;
-    expect(decision.contact.id).toBe('first');
+    expect(decision.recipient.id).toBe('first');
   });
 
   it('runs a whole chain: primary silent, secondary acknowledges', () => {
     let deliveries: DeliveryRecord[] = [];
     let now = NOW;
 
-    const first = nextEscalationStep({ contacts, deliveries, incidentActivatedAt: NOW, now });
+    const first = nextEscalationStep({ recipients, deliveries, alertActivatedAt: NOW, now });
     expect(first.action).toBe('notify');
-    deliveries = [...deliveries, delivery({ contactId: 'primary', sentAt: now })];
+    deliveries = [...deliveries, delivery({ recipientId: 'primary', sentAt: now })];
 
     now += DEFAULT_ESCALATION.windowMs + 1;
-    const second = nextEscalationStep({ contacts, deliveries, incidentActivatedAt: NOW, now });
+    const second = nextEscalationStep({ recipients, deliveries, alertActivatedAt: NOW, now });
     expect(second.action).toBe('notify');
     if (second.action !== 'notify') return;
-    expect(second.contact.id).toBe('secondary');
-    deliveries = [...deliveries, delivery({ contactId: 'secondary', sentAt: now })];
+    expect(second.recipient.id).toBe('secondary');
+    deliveries = [...deliveries, delivery({ recipientId: 'secondary', sentAt: now })];
 
     // The secondary answers.
     deliveries = deliveries.map((record) =>
-      record.contactId === 'secondary' ? { ...record, acknowledgedAt: now + 30_000 } : record,
+      record.recipientId === 'secondary' ? { ...record, acknowledgedAt: now + 30_000 } : record,
     );
 
     now += DEFAULT_ESCALATION.windowMs + 1;
-    const third = nextEscalationStep({ contacts, deliveries, incidentActivatedAt: NOW, now });
+    const third = nextEscalationStep({ recipients, deliveries, alertActivatedAt: NOW, now });
 
-    // The tertiary contact is never woken up.
+    // The tertiary recipient is never woken up.
     expect(third.action).toBe('stop');
     if (third.action !== 'stop') return;
     expect(third.reason).toBe('acknowledged');

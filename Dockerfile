@@ -33,7 +33,7 @@ USER node
 EXPOSE 3003
 
 # Liveness, not readiness. Restarting because a dependency blipped turns a recoverable
-# incident into an outage.
+# alert into an outage.
 HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3   CMD node -e "require('http').get('http://127.0.0.1:3003/health',r=>process.exit(r.statusCode===200?0:1)).on('error',()=>process.exit(1))"
 
 ENTRYPOINT ["/sbin/tini", "--"]

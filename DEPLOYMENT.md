@@ -3,7 +3,7 @@
 **Not deployed anywhere. It is a service, and it runs locally.**
 
 A NestJS service on in-memory adapters by default, so `pnpm dev` needs nothing installed.
-The production queue and the real provider adapters are in `guardianlink-platform`.
+The production queue and the real provider adapters are in `croppulse-platform`.
 
 ## Running it
 

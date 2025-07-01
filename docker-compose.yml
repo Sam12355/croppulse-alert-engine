@@ -6,18 +6,18 @@
 # `pnpm test` touches none of these services. This is here for driving the thing by hand
 # against real backing stores.
 
-name: guardianlink-notification-engine
+name: croppulse-alert-engine
 
 services:
   postgres:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: guardianlink
-      POSTGRES_PASSWORD: guardianlink
-      POSTGRES_DB: guardianlink
+      POSTGRES_USER: croppulse
+      POSTGRES_PASSWORD: croppulse
+      POSTGRES_DB: croppulse
     ports: ['5432:5432']
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U guardianlink']
+      test: ['CMD-SHELL', 'pg_isready -U croppulse']
       interval: 5s
       timeout: 3s
       retries: 20
@@ -42,6 +42,6 @@ services:
     environment:
       NODE_ENV: development
       PORT: '3003'
-      DATABASE_URL: postgres://guardianlink:guardianlink@postgres:5432/guardianlink
+      DATABASE_URL: postgres://croppulse:croppulse@postgres:5432/croppulse
       REDIS_URL: redis://redis:6379
     ports: ['3003:3003']

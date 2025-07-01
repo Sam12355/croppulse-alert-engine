@@ -17,9 +17,9 @@ Tick only what you actually ran, and paste the output for anything that is not o
 
 - [ ] `pnpm lint`
 - [ ] `pnpm typecheck`
-- [ ] `pnpm --filter @guardianlink/api test`
-- [ ] `pnpm --filter @guardianlink/api test:e2e`
-- [ ] `pnpm --filter @guardianlink/web test`
+- [ ] `pnpm --filter @croppulse/api test`
+- [ ] `pnpm --filter @croppulse/api test:e2e`
+- [ ] `pnpm --filter @croppulse/web test`
 - [ ] Android: `./gradlew testDebugUnitTest`
 - [ ] iOS: `xcodebuild test`
 - [ ] Ran it by hand against the local stack

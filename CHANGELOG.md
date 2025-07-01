@@ -17,7 +17,7 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/). Version
 - Failure classification across transient, throttled and permanent
 - Retry-After honoured and capped at the policy ceiling
 - Dead-lettering on budget exhaustion and immediately on a permanent failure
-- Deduplication keyed on incident and contact, checked at send time
+- Deduplication keyed on alert and recipient, checked at send time
 - Escalation chains with a window measured from the last send, a step limit, and a stop on
   any acknowledgement
 - Per-recipient rate limiting over a rolling window

@@ -17,7 +17,7 @@ baseline.
 
 Pure decision logic for notification delivery: retry policy, failure classification,
 deduplication, escalation chains, rate limiting. No transport, no persistence, no provider
-credentials. The running service is `guardianlink-platform`.
+credentials. The running service is `croppulse-platform`.
 
 ## Order of operations
 
@@ -51,7 +51,7 @@ to demonstrate.
 **Deduplication is checked immediately before sending**, never at schedule time. A message
 can sit on a queue for minutes and the recipient may have acknowledged in that time.
 
-**Contact details never enter the decision layer.** `Contact` carries an identifier, a
+**Recipient details never enter the decision layer.** `Recipient` carries an identifier, a
 priority and a channel. The address is resolved by the sender. This layer is the part most
 likely to be logged or dumped into a debugger, so there is nothing sensitive in it to leak.
 
