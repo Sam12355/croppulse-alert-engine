@@ -11,7 +11,7 @@ Hard rules. A change that breaks one of these is rejected regardless of whether 
 4. Log a coordinate, an email address, a phone number, a name, a token or a message body.
 5. Add personal data to an audit record. That table outlives every retention setting in the product.
 6. Return internal detail in an error message: stack traces, SQL, connection strings, file paths.
-7. Add a `DELETE` or `UPDATE` path to `incident_events` or `audit_records`.
+7. Add a `DELETE` or `UPDATE` path to `alert_events` or `audit_records`.
 8. Trust a role, a user id or a tenant from a request body, a query string or a header.
 9. Disable TLS verification, or pin to an insecure algorithm.
 10. Push, deploy, create a cloud resource, or send data to a real external service.
@@ -44,9 +44,9 @@ Hard rules. A change that breaks one of these is rejected regardless of whether 
 Changes here need a spec and a note in the pull request describing the threat considered:
 
 - `application/services/identity.service.ts` and anything under `infrastructure/security/`
-- The authorisation predicate in `application/services/incident.service.ts`
+- The authorisation predicate in `application/services/alert.service.ts`
 - `infrastructure/http/http-plumbing.ts` guards and the idempotency interceptor
 - `application/services/privacy.service.ts`, particularly `executeDeletion`
 - `infrastructure/realtime/realtime.gateway.ts` subscription authorisation
 - The logger redaction list
-- Any migration touching `audit_records` or `incident_events`
+- Any migration touching `audit_records` or `alert_events`

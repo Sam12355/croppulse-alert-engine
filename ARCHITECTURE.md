@@ -54,7 +54,7 @@ the reliability rules over real HTTP.
 
 ```ts
 RetryDecision = { retry, delayMs, attempt } | { deadLetter, reason }
-EscalationDecision = { notify, contact, step } | { wait, untilMs } | { stop, reason } | { exhausted }
+EscalationDecision = { notify, recipient, step } | { wait, untilMs } | { stop, reason } | { exhausted }
 SendDecision = { send: true } | { send: false, reason }
 ```
 
@@ -69,7 +69,7 @@ recalculate it and get it slightly different.
 | Business state and send-intent commit together | A transaction | Database, in the flagship |
 | A message is not lost if the relay dies | Publish-then-mark ordering | Relay, in the flagship |
 | A person is not messaged twice | Dedupe key checked at send time | **Here**, `shouldSend` |
-| An acknowledged contact is never re-sent to | Same check | **Here** |
+| An acknowledged recipient is never re-sent to | Same check | **Here** |
 | A failure is retried appropriately | Classification plus backoff | **Here**, `decide` |
 | Retries do not synchronise | Full jitter | **Here**, `backoffMs` |
 | Escalation reaches the next person | Chain plus window | **Here**, `nextEscalationStep` |
@@ -87,7 +87,7 @@ hoping.
 **Time is a parameter.** Same reason, and it means the escalation tests run instantly
 rather than waiting out three-minute windows.
 
-**Contact carries no address.** An identifier, a priority and a channel. The address is
+**Recipient carries no address.** An identifier, a priority and a channel. The address is
 resolved by the sender at the moment of sending. This layer is the part most likely to end
 up in a log line or a debugger, so there is nothing sensitive in it to leak.
 

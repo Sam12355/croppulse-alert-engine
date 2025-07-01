@@ -1,7 +1,7 @@
 # Threat model
 
 Scoped to this module. The product-level model is in
-`guardianlink-platform/THREAT_MODEL.md`.
+`croppulse-platform/THREAT_MODEL.md`.
 
 ## What is worth protecting
 
@@ -11,13 +11,13 @@ else, no more times than it should.
 ## T1. Duplicate delivery to a person
 
 **Vector:** at-least-once queue delivery, a worker crashing after sending and before
-recording, a scheduler overlapping with itself, or an operator replaying a dead-lettered
+recording, a scheduler overlapping with itself, or an agronomist replaying a dead-lettered
 message.
 
 **Why it matters:** a family receiving five alerts for one event learns to ignore alerts.
-That is a safety failure, not an annoyance.
+That is a crop lost, not an annoyance.
 
-**Mitigation:** dedupe key of incident plus contact, checked immediately before sending
+**Mitigation:** dedupe key of alert plus recipient, checked immediately before sending
 rather than when scheduling. A test sends the same message five times and asserts one
 delivery.
 
@@ -35,13 +35,13 @@ stops a manual replay too.
 
 ## T3. Notification flooding
 
-**Vector:** a bug, or a genuine burst of incidents, turning into a stream of messages to
+**Vector:** a bug, or a genuine burst of alerts, turning into a stream of messages to
 one person.
 
 **Mitigation:** per-recipient cap per rolling window, and a step limit on the escalation
-chain so an account with twenty contacts does not wake all of them.
+chain so an account with twenty recipients does not wake all of them.
 
-**Residual:** the cap is per recipient per window. A sustained real incident rate can still
+**Residual:** the cap is per recipient per window. A sustained real alert rate can still
 be noisy, and no product-level suppression exists.
 
 ## T4. Retry storms amplifying an outage
@@ -65,16 +65,16 @@ address burns the budget. Provider-specific mapping would fix it and is not impl
 
 ## T6. Escalation stalling
 
-**Vector:** a contact who cannot be reached blocks the chain, so nobody else is told.
+**Vector:** a recipient who cannot be reached blocks the chain, so nobody else is told.
 
 **Mitigation:** a dead-lettered delivery counts as contacted and the chain moves on.
 Retrying is the retry loop's job.
 
-## T7. Contact details leaking through a decision path
+## T7. Recipient details leaking through a decision path
 
 **Vector:** an address or number in a log line, a trace, or a debugger dump.
 
-**Mitigation:** the decision layer never sees them. `Contact` carries identifiers only, and
+**Mitigation:** the decision layer never sees them. `Recipient` carries identifiers only, and
 resolution happens at the sender.
 
 ## Out of scope

@@ -37,7 +37,7 @@ let clock: ControllableClock;
 let store: MemoryNotificationStore;
 let sms: MockChannelAdapter;
 
-const INCIDENT = 'incident-1';
+const INCIDENT = 'alert-1';
 const ACTIVATED_AT = 1_773_000_000_000;
 
 async function boot(smsScript: number[] = []) {
@@ -45,7 +45,7 @@ async function boot(smsScript: number[] = []) {
   store = new MemoryNotificationStore();
   sms = new MockChannelAdapter('sms', smsScript);
 
-  store.seedContacts(INCIDENT, [
+  store.seedRecipients(INCIDENT, [
     { id: 'primary', priority: 1, channel: 'sms' },
     { id: 'secondary', priority: 2, channel: 'sms' },
     { id: 'tertiary', priority: 3, channel: 'sms' },
@@ -65,7 +65,7 @@ async function boot(smsScript: number[] = []) {
 }
 
 const escalate = () =>
-  request(http).post('/api/notifications/escalate').send({ incidentId: INCIDENT, activatedAt: ACTIVATED_AT });
+  request(http).post('/api/notifications/escalate').send({ alertId: INCIDENT, activatedAt: ACTIVATED_AT });
 
 const drain = () => request(http).post('/api/notifications/drain');
 
@@ -82,11 +82,11 @@ describe('the service runs', () => {
 });
 
 describe('escalation over HTTP', () => {
-  it('notifies the primary contact immediately', async () => {
+  it('notifies the primary recipient immediately', async () => {
     await boot();
 
     const response = await escalate().expect(200);
-    expect(response.body).toEqual({ action: 'notify', contactId: 'primary' });
+    expect(response.body).toEqual({ action: 'notify', recipientId: 'primary' });
 
     const drained = await drain().expect(200);
     expect(drained.body.sent).toBe(1);
@@ -111,7 +111,7 @@ describe('escalation over HTTP', () => {
     clock.advance(DEFAULT_ESCALATION.windowMs + 1);
     const response = await escalate().expect(200);
 
-    expect(response.body).toEqual({ action: 'notify', contactId: 'secondary' });
+    expect(response.body).toEqual({ action: 'notify', recipientId: 'secondary' });
   });
 
   it('stops the chain the moment somebody acknowledges', async () => {
@@ -120,13 +120,13 @@ describe('escalation over HTTP', () => {
     await drain();
 
     await request(http)
-      .post(`/api/notifications/incidents/${INCIDENT}/contacts/primary/acknowledge`)
+      .post(`/api/notifications/alerts/${INCIDENT}/recipients/primary/acknowledge`)
       .expect(200);
 
     clock.advance(DEFAULT_ESCALATION.windowMs * 10);
     const response = await escalate().expect(200);
 
-    // The tertiary contact is never woken up.
+    // The tertiary recipient is never woken up.
     expect(response.body.action).toBe('acknowledged');
   });
 
@@ -138,7 +138,7 @@ describe('escalation over HTTP', () => {
       const response = await escalate().expect(200);
 
       if (response.body.action === 'notify') {
-        notified.push(response.body.contactId);
+        notified.push(response.body.recipientId);
         await drain();
       } else if (response.body.action === 'wait') {
         clock.advance(DEFAULT_ESCALATION.windowMs + 1);
@@ -181,7 +181,7 @@ describe('deduplication over HTTP', () => {
     expect(deadLetters.body.items.length).toBe(1);
 
     await request(http)
-      .post(`/api/notifications/incidents/${INCIDENT}/contacts/primary/acknowledge`)
+      .post(`/api/notifications/alerts/${INCIDENT}/recipients/primary/acknowledge`)
       .expect(200);
 
     await request(http)
@@ -231,7 +231,7 @@ describe('retries and dead-lettering over HTTP', () => {
     await drain();
 
     const response = await request(http).get('/api/notifications/dead-letters').expect(200);
-    expect(response.body.items[0].contactId).toBe('primary');
+    expect(response.body.items[0].recipientId).toBe('primary');
     expect(response.body.items[0].lastError).toBeTruthy();
   });
 
@@ -262,17 +262,17 @@ describe('retries and dead-lettering over HTTP', () => {
 });
 
 describe('what the delivery endpoint exposes', () => {
-  it('returns identifiers and status, never contact details', async () => {
+  it('returns identifiers and status, never recipient details', async () => {
     await boot();
     await escalate();
     await drain();
 
     const response = await request(http)
-      .get(`/api/notifications/incidents/${INCIDENT}/deliveries`)
+      .get(`/api/notifications/alerts/${INCIDENT}/deliveries`)
       .expect(200);
 
     expect(response.body.items[0]).toEqual({
-      contactId: 'primary',
+      recipientId: 'primary',
       status: 'sent',
       sentAt: expect.any(Number),
       acknowledgedAt: null,

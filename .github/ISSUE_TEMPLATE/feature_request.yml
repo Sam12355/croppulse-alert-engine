@@ -51,7 +51,7 @@ body:
     attributes:
       label: Which surfaces are affected
       multiple: true
-      options: [API, Web portal, Operator console, iOS, Android, Infrastructure, Docs]
+      options: [API, Web portal, Agronomist console, iOS, Android, Infrastructure, Docs]
     validations:
       required: true
 

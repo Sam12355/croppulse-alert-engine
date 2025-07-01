@@ -1,5 +1,5 @@
 {
-  "name": "guardianlink-notification-engine",
+  "name": "croppulse-alert-engine",
   "version": "0.1.0",
   "private": true,
   "description": "Reliable notification and escalation: outbox, idempotency, retries, dead-letter handling and provider failover.",

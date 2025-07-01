@@ -79,7 +79,7 @@ export function decide(
   random: number,
 ): RetryDecision {
   // A permanent failure is not retried at all. Five attempts at an address that does not
-  // exist wastes the budget and delays the point at which somebody notices the contact
+  // exist wastes the budget and delays the point at which somebody notices the recipient
   // details are wrong.
   if (outcome.failure === 'permanent') {
     return { action: 'dead-letter', reason: 'permanent failure, retrying cannot help' };

@@ -36,7 +36,7 @@ not by how likely it is.
 - [ ] Does every mutation carry an expected version?
 - [ ] Is there a check-then-write that two concurrent callers could both pass?
 - [ ] Does anything hold a lock or a lease with no expiry?
-- [ ] If two operators do this simultaneously, does one get a clear conflict rather than a silent
+- [ ] If two agronomists do this simultaneously, does one get a clear conflict rather than a silent
       overwrite?
 
 ## Data consistency

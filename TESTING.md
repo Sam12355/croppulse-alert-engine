@@ -17,8 +17,8 @@ suite.
 | Backoff | Exponential growth, ceiling, full-jitter spread, equal-jitter floor, zero before the first retry |
 | Classification | Ten status codes across transient, throttled and permanent |
 | Retry decisions | Transient retried, permanent never retried, budget exhaustion, Retry-After honoured and capped, a full walk to dead-letter |
-| Deduplication | First send, repeat suppressed, in-flight suppressed, dead-letter replay allowed, acknowledged never re-sent, per-incident scoping, five replays produce one delivery |
-| Escalation | Immediate primary, window wait, escalation on silence, window measured from last send, stop on any acknowledgement, step limit, no contacts, dead-lettered counts as contacted, priority order, a full chain |
+| Deduplication | First send, repeat suppressed, in-flight suppressed, dead-letter replay allowed, acknowledged never re-sent, per-alert scoping, five replays produce one delivery |
+| Escalation | Immediate primary, window wait, escalation on silence, window measured from last send, stop on any acknowledgement, step limit, no recipients, dead-lettered counts as contacted, priority order, a full chain |
 | Rate limiting | Under cap, at cap, aged-out sends ignored |
 
 ## The four that matter most
@@ -33,7 +33,7 @@ replay of a dead-lettered message. Messaging someone who has already answered is
 not messaging them at all.
 
 **"measures the window from the last send, not from the first".** A slow first delivery
-must not eat the time the second contact gets.
+must not eat the time the second recipient gets.
 
 **"spreads full jitter across the whole window".** Jitter is the difference between a brief
 provider outage and a long one. Without an injected random source it cannot be asserted at
