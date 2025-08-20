@@ -95,6 +95,6 @@ identifiers rewritten along with the code, which would have left text no run eve
 | Item | Why |
 |------|-----|
 | Against real Postgres or Redis | The default adapters are in-memory. `docker compose up` starts both for driving it by hand |
-| Docker image build | Dockerfile written; not built on this machine |
+| Docker image build | Built and run on 2026-07-31. `docker build -t croppulse-engine .` then `docker run`; the container answers `/health` with `{"status":"ok"}` |
 | Load test | No throughput number is claimed anywhere in this repository |
 | Deployed anywhere | Never |
