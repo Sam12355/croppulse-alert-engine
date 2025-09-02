@@ -20,7 +20,7 @@ bindings; nothing above the port changes.
 
 It is not published to any registry, and no version has ever been released. Were that to
 change, the release would be: tag, CI runs the full verify, `pnpm publish --access public`
-behind a manual approval. The versioning tooling in `native-release-lab/tools` derives
+behind a manual approval. The versioning tooling in `buildtrack-site-manager/tools` derives
 the version from git rather than having anyone type it.
 
 ## Verification status

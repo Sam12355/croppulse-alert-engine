@@ -39,7 +39,7 @@ covered at the same level as happy paths.
 Tests are written **from the acceptance criteria, before the implementation**. A test
 written afterwards asserts what the code does, which is not the same as what it should do.
 That ordering has caught real bugs across this portfolio; the record is in
-`ai-engineering-playbook/AI_WORKLOG.md`.
+`estateflow-property-portal/AI_WORKLOG.md`.
 
 ## Before opening a pull request
 
