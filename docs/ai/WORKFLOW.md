@@ -55,7 +55,9 @@ justification; missing failure paths; scope that has quietly grown.
 Tasks small enough that a human can genuinely review the diff in one sitting. A 900-line diff gets
 skimmed, and a skimmed diff is an unreviewed diff. Roughly: one layer, one behaviour, one commit.
 
-Independent tasks can run in parallel worktrees. See [WORKTREES.md](WORKTREES.md).
+Independent tasks can run in parallel worktrees. The write-up of how that is set up lives in
+the estateflow-property-portal repository, under `docs/ai/WORKTREES.md`, because that is the
+repository this process is documented in.
 
 ## 5. Implementation
 
