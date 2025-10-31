@@ -3,8 +3,7 @@
 **Getting a crop alert to the person who can act on it, reliably, exactly once as far as
 they can tell, when the provider is down and the queue delivers twice.**
 
-> Part of the [portfolio](../PORTFOLIO.md). A demonstration, not a service anybody runs a
-> farm on.
+> A demonstration, not a service anybody runs a farm on.
 
 > **A reconstruction, not an employer's codebase.** Crop monitoring produces alerts nobody
 > is sitting waiting for: a soil moisture reading crosses a threshold at four in the
