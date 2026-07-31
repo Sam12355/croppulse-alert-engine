@@ -18,7 +18,7 @@ jobs:
     name: lint, type-check, test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: pnpm/action-setup@v4
         with:
@@ -46,7 +46,7 @@ jobs:
     name: dependency and secret scanning
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # Full history. A secret committed and later removed still leaked, and a shallow
           # clone would not find it.
